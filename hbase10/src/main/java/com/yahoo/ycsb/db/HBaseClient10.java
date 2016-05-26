@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.lang.System.*;
 
 /**
  * HBase 1.0 client for YCSB framework.
@@ -111,6 +112,8 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
    */
   @Override
   public void init() throws DBException {
+    System.out.println("HBaseClient10.java lastest update time : 5/26 3:52");  
+      
     if ("true"
         .equals(getProperties().getProperty("clientbuffering", "false"))) {
       this.clientSideBuffering = true;
