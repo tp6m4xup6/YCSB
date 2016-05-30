@@ -102,8 +102,8 @@ public abstract class DB
 	 * @param result A Vector of HashMaps, where each HashMap is a set field/value pairs for one record
 	 * @return The result of the operation.
 	 */
-	public abstract Status scan(String table, String startkey, int recordcount, Set<String> fields, Vector<HashMap<String,ByteIterator>> result);
-	
+	public abstract Status scan(String table, String startkey,String family, int recordcount, Set<String> fields, Vector<HashMap<String,ByteIterator>> result);
+	                                                                                       
 	/**
 	 * Update a record in the database. Any field/value pairs in the specified values HashMap will be written into the record with the specified
 	 * record key, overwriting any existing values with the same field name.
@@ -113,7 +113,7 @@ public abstract class DB
 	 * @param values A HashMap of field/value pairs to update in the record
 	 * @return The result of the operation.
 	 */
-	public abstract Status update(String table, String key, HashMap<String,ByteIterator> values);
+	public abstract Status update(String table, String key,String family, HashMap<String,ByteIterator> values);
 
 	/**
 	 * Insert a record in the database. Any field/value pairs in the specified values HashMap will be written into the record with the specified
@@ -124,7 +124,7 @@ public abstract class DB
 	 * @param values A HashMap of field/value pairs to insert in the record
 	 * @return The result of the operation.
 	 */
-	public abstract Status insert(String table, String key, HashMap<String,ByteIterator> values);
+	public abstract Status insert(String table, String key,String family, HashMap<String,ByteIterator> values);
 
 	/**
 	 * Delete a record from the database. 

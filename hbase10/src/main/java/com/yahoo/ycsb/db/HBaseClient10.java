@@ -166,7 +166,7 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
       usePageFilter = false;
     }
 
-    columnFamily = getProperties().getProperty("columnfamily");
+    columnFamily = getProperties().getProperty("columnfamily","family");
     if (columnFamily == null) {
       System.err.println("Error, must specify a columnfamily for HBase table");
       throw new DBException("No columnfamily specified");
@@ -249,9 +249,10 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
    *          A HashMap of field/value pairs for the result
    * @return Zero on success, a non-zero error code on error
    */
-  public Status read(String table, String key, Set<String> fields,
+  public Status read(String table, String key,String family ,Set<String> fields,
       HashMap<String, ByteIterator> result) {
     // if this is a "new" table, init HTable object. Else, use existing one
+    byte[] familyBytes = Bytes.toBytes(family);  
     if (!tableName.equals(table)) {
       currentTable = null;
       try {
@@ -272,10 +273,10 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
       }
       Get g = new Get(Bytes.toBytes(key));
       if (fields == null) {
-        g.addFamily(columnFamilyBytes);
+        g.addFamily(familyBytes);
       } else {
         for (String field : fields) {
-          g.addColumn(columnFamilyBytes, Bytes.toBytes(field));
+          g.addColumn(familyBytes, Bytes.toBytes(field));
         }
       }
       r = currentTable.get(g);
@@ -306,6 +307,11 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
     return Status.OK;
   }
 
+  
+  public Status read(String table, String key,Set<String> fields,HashMap<String, ByteIterator> result){
+      return Status.OK;
+  }
+  
   /**
    * Perform a range scan for a set of records in the database. Each field/value
    * pair from the result will be stored in a HashMap.
@@ -324,8 +330,10 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
    * @return Zero on success, a non-zero error code on error
    */
   @Override
-  public Status scan(String table, String startkey, int recordcount,
+  public Status scan(String table, String startkey,String family, int recordcount,
       Set<String> fields, Vector<HashMap<String, ByteIterator>> result) {
+      
+      byte[] familyBytes = Bytes.toBytes(family);  
     // if this is a "new" table, init HTable object. Else, use existing one
     if (!tableName.equals(table)) {
       currentTable = null;
@@ -348,11 +356,12 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
     }
 
     // add specified fields or else all fields
+    
     if (fields == null) {
-      s.addFamily(columnFamilyBytes);
+      s.addFamily(familyBytes);
     } else {
       for (String field : fields) {
-        s.addColumn(columnFamilyBytes, Bytes.toBytes(field));
+        s.addColumn(familyBytes, Bytes.toBytes(field));
       }
     }
 
@@ -402,7 +411,10 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
 
     return Status.OK;
   }
-
+public Status scan(String table, String startkey, int recordcount,
+      Set<String> fields, Vector<HashMap<String, ByteIterator>> result){
+    return Status.OK;
+}
   /**
    * Update a record in the database. Any field/value pairs in the specified
    * values HashMap will be written into the record with the specified record
@@ -417,8 +429,10 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
    * @return Zero on success, a non-zero error code on error
    */
   @Override
-  public Status update(String table, String key,
+  public Status update(String table, String key,String family,
       HashMap<String, ByteIterator> values) {
+    byte[] familyBytes = Bytes.toBytes(family);  
+      
     // if this is a "new" table, init HTable object. Else, use existing one
     if (!tableName.equals(table)) {
       currentTable = null;
@@ -442,7 +456,7 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
         System.out.println("Adding field/value " + entry.getKey() + "/"
             + Bytes.toStringBinary(value) + " to put request");
       }
-      p.addColumn(columnFamilyBytes, Bytes.toBytes(entry.getKey()), value);
+      p.addColumn(familyBytes, Bytes.toBytes(entry.getKey()), value);
     }
 
     try {
@@ -465,6 +479,12 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
     return Status.OK;
   }
 
+  
+  public Status update(String table, String key,
+      HashMap<String, ByteIterator> values){
+      return Status.OK;
+  }
+  
   /**
    * Insert a record in the database. Any field/value pairs in the specified
    * values HashMap will be written into the record with the specified record
@@ -479,9 +499,14 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
    * @return Zero on success, a non-zero error code on error
    */
   @Override
+  public Status insert(String table, String key,String family,
+      HashMap<String, ByteIterator> values) {
+    return update(table, key, family, values);
+  }
+  
   public Status insert(String table, String key,
       HashMap<String, ByteIterator> values) {
-    return update(table, key, values);
+      return update(table, key, values);
   }
 
   /**
@@ -494,7 +519,7 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
    * @return Zero on success, a non-zero error code on error
    */
   @Override
-  public Status delete(String table, String key) {
+  public Status delete(String table, String key) { 
     // if this is a "new" table, init HTable object. Else, use existing one
     if (!tableName.equals(table)) {
       currentTable = null;
@@ -530,6 +555,7 @@ public class HBaseClient10 extends com.yahoo.ycsb.DB {
     return Status.OK;
   }
 
+ 
   @VisibleForTesting
   void setConfiguration(final Configuration newConfig) {
     this.config = newConfig;

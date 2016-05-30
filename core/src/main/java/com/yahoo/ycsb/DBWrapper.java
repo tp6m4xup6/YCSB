@@ -142,7 +142,7 @@ public class DBWrapper extends DB
    * @param result A HashMap of field/value pairs for the result
    * @return The result of the operation.
    */
-  public Status read(String table, String key, Set<String> fields,
+  public Status read(String table, String key,Set<String> fields,
       HashMap<String,ByteIterator> result)
   {
     try (final TraceScope span = _tracer.newScope(SCOPE_STRING_READ)) {
@@ -167,13 +167,13 @@ public class DBWrapper extends DB
    * @param result A Vector of HashMaps, where each HashMap is a set field/value pairs for one record
    * @return The result of the operation.
    */
-  public Status scan(String table, String startkey, int recordcount,
+  public Status scan(String table, String startkey,String family, int recordcount,
       Set<String> fields, Vector<HashMap<String,ByteIterator>> result)
   {
     try (final TraceScope span = _tracer.newScope(SCOPE_STRING_SCAN)) {
       long ist=_measurements.getIntendedtartTimeNs();
       long st = System.nanoTime();
-      Status res=_db.scan(table,startkey,recordcount,fields,result);
+      Status res=_db.scan(table,startkey, family,recordcount,fields,result);
       long en=System.nanoTime();
       measure("SCAN", res, ist, st, en);
       _measurements.reportStatus("SCAN", res);
@@ -207,13 +207,13 @@ public class DBWrapper extends DB
    * @param values A HashMap of field/value pairs to update in the record
    * @return The result of the operation.
    */
-  public Status update(String table, String key,
+  public Status update(String table, String key,String family,
       HashMap<String,ByteIterator> values)
   {
     try (final TraceScope span = _tracer.newScope(SCOPE_STRING_UPDATE)) {
       long ist=_measurements.getIntendedtartTimeNs();
       long st = System.nanoTime();
-      Status res=_db.update(table,key,values);
+      Status res=_db.update(table,key,family,values);
       long en=System.nanoTime();
       measure("UPDATE", res, ist, st, en);
       _measurements.reportStatus("UPDATE", res);
@@ -231,13 +231,13 @@ public class DBWrapper extends DB
    * @param values A HashMap of field/value pairs to insert in the record
    * @return The result of the operation.
    */
-  public Status insert(String table, String key,
+  public Status insert(String table, String key,String family,
       HashMap<String,ByteIterator> values)
   {
     try (final TraceScope span = _tracer.newScope(SCOPE_STRING_INSERT)) {
       long ist=_measurements.getIntendedtartTimeNs();
       long st = System.nanoTime();
-      Status res=_db.insert(table,key,values);
+      Status res=_db.insert(table,key,family,values);
       long en=System.nanoTime();
       measure("INSERT", res, ist, st, en);
       _measurements.reportStatus("INSERT", res);

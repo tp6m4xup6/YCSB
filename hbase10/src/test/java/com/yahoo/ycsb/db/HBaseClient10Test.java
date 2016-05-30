@@ -118,92 +118,94 @@ public class HBaseClient10Test {
     testingUtil.deleteTable(CoreWorkload.table);
   }
 
-  @Test
-  public void testRead() throws Exception {
-    final String rowKey = "row1";
-    final Put p = new Put(Bytes.toBytes(rowKey));
-    p.addColumn(Bytes.toBytes(COLUMN_FAMILY),
-        Bytes.toBytes("column1"), Bytes.toBytes("value1"));
-    p.addColumn(Bytes.toBytes(COLUMN_FAMILY),
-        Bytes.toBytes("column2"), Bytes.toBytes("value2"));
-    table.put(p);
-
-    final HashMap<String, ByteIterator> result = new HashMap<String, ByteIterator>();
-    final Status status = client.read(CoreWorkload.table, rowKey, null, result);
-    assertEquals(Status.OK, status);
-    assertEquals(2, result.size());
-    assertEquals("value1", result.get("column1").toString());
-    assertEquals("value2", result.get("column2").toString());
-  }
-
-  @Test
-  public void testReadMissingRow() throws Exception {
-    final HashMap<String, ByteIterator> result = new HashMap<String, ByteIterator>();
-    final Status status = client.read(CoreWorkload.table, "Missing row", null, result);
-    assertEquals(Status.NOT_FOUND, status);
-    assertEquals(0, result.size());
-  }
-
-  @Test
-  public void testScan() throws Exception {
-    // Fill with data
-    final String colStr = "row_number";
-    final byte[] col = Bytes.toBytes(colStr);
-    final int n = 10;
-    final List<Put> puts = new ArrayList<Put>(n);
-    for(int i = 0; i < n; i++) {
-      final byte[] key = Bytes.toBytes(String.format("%05d", i));
-      final byte[] value = java.nio.ByteBuffer.allocate(4).putInt(i).array();
-      final Put p = new Put(key);
-      p.addColumn(Bytes.toBytes(COLUMN_FAMILY), col, value);
-      puts.add(p);
-    }
-    table.put(puts);
-
-    // Test
-    final Vector<HashMap<String, ByteIterator>> result =
-        new Vector<HashMap<String, ByteIterator>>();
-
-    // Scan 5 records, skipping the first
-    client.scan(CoreWorkload.table, "00001", 5, null, result);
-
-    assertEquals(5, result.size());
-    for(int i = 0; i < 5; i++) {
-      final HashMap<String, ByteIterator> row = result.get(i);
-      assertEquals(1, row.size());
-      assertTrue(row.containsKey(colStr));
-      final byte[] bytes = row.get(colStr).toArray();
-      final ByteBuffer buf = ByteBuffer.wrap(bytes);
-      final int rowNum = buf.getInt();
-      assertEquals(i + 1, rowNum);
-    }
-  }
-
-  @Test
-  public void testUpdate() throws Exception{
-    final String key = "key";
-    final HashMap<String, String> input = new HashMap<String, String>();
-    input.put("column1", "value1");
-    input.put("column2", "value2");
-    final Status status = client.insert(CoreWorkload.table, key, StringByteIterator.getByteIteratorMap(input));
-    assertEquals(Status.OK, status);
-
-    // Verify result
-    final Get get = new Get(Bytes.toBytes(key));
-    final Result result = this.table.get(get);
-    assertFalse(result.isEmpty());
-    assertEquals(2, result.size());
-    for(final java.util.Map.Entry<String, String> entry : input.entrySet()) {
-      assertEquals(entry.getValue(),
-          new String(result.getValue(Bytes.toBytes(COLUMN_FAMILY),
-            Bytes.toBytes(entry.getKey()))));
-    }
-  }
-
-  @Test
-  @Ignore("Not yet implemented")
-  public void testDelete() {
-    fail("Not yet implemented");
-  }
+//  @Test
+//  public void testRead() throws Exception {
+//    final String rowKey = "row1";
+//    final Put p = new Put(Bytes.toBytes(rowKey));
+//    p.addColumn(Bytes.toBytes(COLUMN_FAMILY),
+//        Bytes.toBytes("column1"), Bytes.toBytes("value1"));
+//    p.addColumn(Bytes.toBytes(COLUMN_FAMILY),
+//        Bytes.toBytes("column2"), Bytes.toBytes("value2"));
+//    table.put(p);
+//
+//    final HashMap<String, ByteIterator> result = new HashMap<String, ByteIterator>();
+//    final Status status = client.read(CoreWorkload.table, rowKey, null, result);
+//    assertEquals(Status.OK, status);
+//    assertEquals(2, result.size());
+//    assertEquals("value1", result.get("column1").toString());
+//    assertEquals("value2", result.get("column2").toString());
+//  }
+//
+//  @Test
+//  public void testReadMissingRow() throws Exception {
+//    final HashMap<String, ByteIterator> result = new HashMap<String, ByteIterator>();
+//    final Status status = client.read(CoreWorkload.table, "Missing row", null, result);
+//    assertEquals(Status.NOT_FOUND, status);
+//    assertEquals(0, result.size());
+//  }
+//
+//  @Test
+//  public void testScan() throws Exception {
+//    // Fill with data
+//    final String colStr = "row_number";
+//    final byte[] col = Bytes.toBytes(colStr);
+//    final int n = 10;
+//    final List<Put> puts = new ArrayList<Put>(n);
+//    for(int i = 0; i < n; i++) {
+//      final byte[] key = Bytes.toBytes(String.format("%05d", i));
+//      final byte[] value = java.nio.ByteBuffer.allocate(4).putInt(i).array();
+//      final Put p = new Put(key);
+//      p.addColumn(Bytes.toBytes(COLUMN_FAMILY), col, value);
+//      puts.add(p);
+//    }
+//    table.put(puts);
+//
+//    // Test
+//    final Vector<HashMap<String, ByteIterator>> result =
+//        new Vector<HashMap<String, ByteIterator>>();
+//
+//    // Scan 5 records, skipping the first
+//    client.scan(CoreWorkload.table, "00001", 5, null, result);
+//
+//    assertEquals(5, result.size());
+//    for(int i = 0; i < 5; i++) {
+//      final HashMap<String, ByteIterator> row = result.get(i);
+//      assertEquals(1, row.size());
+//      assertTrue(row.containsKey(colStr));
+//      final byte[] bytes = row.get(colStr).toArray();
+//      final ByteBuffer buf = ByteBuffer.wrap(bytes);
+//      final int rowNum = buf.getInt();
+//      assertEquals(i + 1, rowNum);
+//    }
+//  }
+//
+//  @Test
+//  public void testUpdate() throws Exception{
+//    final String key = "key";
+//    final HashMap<String, String> input = new HashMap<String, String>();
+//    input.put("column1", "value1");
+//    input.put("column2", "value2");
+//    final Status status = client.insert(CoreWorkload.table, key, StringByteIterator.getByteIteratorMap(input));
+//    assertEquals(Status.OK, status);
+//
+//    // Verify result
+//    final Get get = new Get(Bytes.toBytes(key));
+//    final Result result = this.table.get(get);
+//    assertFalse(result.isEmpty());
+//    assertEquals(2, result.size());
+//    for(final java.util.Map.Entry<String, String> entry : input.entrySet()) {
+//      assertEquals(entry.getValue(),
+//          new String(result.getValue(Bytes.toBytes(COLUMN_FAMILY),
+//            Bytes.toBytes(entry.getKey()))));
+//    }
+//  }
+//
+//  @Test
+//  @Ignore("Not yet implemented")
+//  public void testDelete() {
+//    fail("Not yet implemented");
+//  }
+  
+  
 }
 
