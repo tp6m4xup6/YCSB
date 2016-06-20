@@ -474,6 +474,7 @@ class ClientThread implements Runnable
 
           if (!_workload.doInsert(_db,_workloadstate))
           {
+            
             break;
           }
 

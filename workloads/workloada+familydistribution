@@ -22,14 +22,24 @@
 #   Default data size: 1 KB records (10 fields, 100 bytes each, plus key)
 #   Request distribution: zipfian
 
-recordcount=20
-operationcount=20
+#bin/ycsb load hbase10 -P workloads/workloada+familydistribution -cp /etc/hbase/conf/ -p table=chen10
+
+growfield=true
+familycount=1
+fieldexpension=uniform
+recordhandlefield=10000
+
+fieldcount=10000
+
+recordcount=30
+operationcount=5
+
 workload=com.yahoo.ycsb.workloads.CoreWorkload
 
 readallfields=true
 
-readproportion=0.5
-updateproportion=0.5
+readproportion=1
+updateproportion=0
 scanproportion=0
 insertproportion=0
 

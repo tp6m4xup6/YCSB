@@ -40,6 +40,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -90,8 +92,36 @@ import java.util.Vector;
  */
 public class CoreWorkload extends Workload {
 
+    /**
+     * The properties which chen10 added,
+     */
+    //有比例的 family分布
     public static final String FAMILY_PROPORTION = "familyproportion";
     public static final String DEFAULT_FAMILY_PROPORTION = "(family,1)";
+
+    public static final String GROW_FIELD = "growfield";
+    public static final String DEFAULT_GROW_FIELD = "false";
+
+    //field 增長的方式   fieldExpension 
+    public static final String FIELD_EXPENSION = "fieldExpension";
+    public static final String DEFAULT_FIELD_EXPENSION = "uniform";
+
+    //YCSB 讀寫操作的family的數量(default : 1)。
+    public static final String FAMILY_COUNT = "familycount";
+    public static final String DEFAULT_FAMILY_COUNT = "1";
+
+    //field 插入的欄位數量
+    public static final String RECORD_HANDLE_FIELD_COUNT = "recordhandlefield";
+    public static final String DEFAULT_HANDLE_RECORD_FIELD_COUNT = "10";
+
+    NumberGenerator growFamilyFieldchooser;
+
+    int familycount;
+    int recordhandlefieldcount;
+
+    boolean growfield;
+    String defaultFamily = "family";
+    String defaultField = "field";
 
     /**
      * The name of the database table to run queries against.
@@ -351,7 +381,6 @@ public class CoreWorkload extends Workload {
     NumberGenerator keysequence;
 
     DiscreteGenerator operationchooser;
-    DiscreteGenerator familychooser;
 
     NumberGenerator keychooser;
 
@@ -405,15 +434,31 @@ public class CoreWorkload extends Workload {
      */
     @Override
     public void init(Properties p) throws WorkloadException {
-        table = p.getProperty(TABLENAME_PROPERTY, TABLENAME_PROPERTY_DEFAULT);
 
-        fieldcount
-                = Integer.parseInt(p.getProperty(FIELD_COUNT_PROPERTY, FIELD_COUNT_PROPERTY_DEFAULT));
+        /**
+         * chen10 add some properties in init
+         */
+//        testZipFian(1, 10);
+        table = p.getProperty(TABLENAME_PROPERTY, TABLENAME_PROPERTY_DEFAULT);
+        System.out.println("CoreWorkload.init: " + table);
+
+        growfield = Boolean.parseBoolean(p.getProperty(GROW_FIELD, DEFAULT_GROW_FIELD));
+
+        fieldcount = Integer.parseInt(p.getProperty(FIELD_COUNT_PROPERTY, FIELD_COUNT_PROPERTY_DEFAULT));
         fieldnames = new ArrayList<String>();
         for (int i = 0; i < fieldcount; i++) {
             fieldnames.add("field" + i);
         }
         fieldlengthgenerator = CoreWorkload.getFieldLengthGenerator(p);
+
+        // YCSB 讀寫操作的family的數量
+        familycount = Integer.parseInt(p.getProperty(FAMILY_COUNT, DEFAULT_FAMILY_COUNT));
+
+        //設置每一筆資料要插入幾個物件
+        recordhandlefieldcount = Integer.parseInt(p.getProperty(RECORD_HANDLE_FIELD_COUNT, DEFAULT_HANDLE_RECORD_FIELD_COUNT));
+        if (recordhandlefieldcount == 0) {
+            recordhandlefieldcount = Integer.parseInt(DEFAULT_HANDLE_RECORD_FIELD_COUNT);
+        }
 
         recordcount
                 = Integer.parseInt(p.getProperty(Client.RECORD_COUNT_PROPERTY, Client.DEFAULT_RECORD_COUNT));
@@ -472,7 +517,8 @@ public class CoreWorkload extends Workload {
 
         keysequence = new CounterGenerator(insertstart);
         operationchooser = createOperationGenerator(p);
-        familychooser = createFamilyGenerator(p);
+
+        growFamilyFieldchooser = createFieldGrower(p);
 
         transactioninsertkeysequence = new AcknowledgedCounterGenerator(recordcount);
         if (requestdistrib.compareTo("uniform") == 0) {
@@ -509,6 +555,8 @@ public class CoreWorkload extends Workload {
         }
 
         fieldchooser = new UniformIntegerGenerator(0, fieldcount - 1);
+        
+       
 
         if (scanlengthdistrib.compareTo("uniform") == 0) {
             scanlength = new UniformIntegerGenerator(1, maxscanlength);
@@ -523,8 +571,92 @@ public class CoreWorkload extends Workload {
                 INSERTION_RETRY_LIMIT, INSERTION_RETRY_LIMIT_DEFAULT));
         insertionRetryInterval = Integer.parseInt(p.getProperty(
                 INSERTION_RETRY_INTERVAL, INSERTION_RETRY_INTERVAL_DEFAULT));
+
+        
+//        testGrowFieldValues();
+        testGetValueCostTime();
     }
 
+//    public void testGrowFieldValues() {
+//
+//        for (int count = 0; count < 10; count++) {
+//
+//            int fieldchoosedcount =0
+//            boolean[] fieldchoosed = new boolean[fieldcount];
+//            
+//            StringBuilder sb = new StringBuilder();
+//    while(fieldchoosedcount<3){
+//            for (int i = 0; i < 3; i++) {
+//                int nextFieldValue = fieldchooser.nextValue().intValue();
+//                if (fieldchoosed[nextFieldValue]) {
+//                    continue;
+//                } else {
+//                    fieldchoosed[nextFieldValue] = true;
+//                }
+//
+//                String fieldkey = fieldnames.get(nextFieldValue);
+//
+//                sb.append(fieldkey + ",");
+//
+//            }
+//
+//            System.out.println(sb.toString());
+//        }
+//    }
+//
+//    public void testZipFian(int start, int finish) {
+//
+//        NumberGenerator testZipfianFgenerator = new ZipfianGenerator(start, finish);
+//
+//        System.out.println("Test  zipfian");
+//        System.out.println("\tnextString\tlastString\tnextValue\tlastvalue");
+//
+//        StringBuilder newRecord = new StringBuilder();
+//
+//        HashMap<Number, Integer> count = new HashMap<Number, Integer>();
+//        for (int i = start; i <= finish; i++) {
+//            System.out.println(testZipfianFgenerator.lastValue());
+//
+//            Number value = testZipfianFgenerator.nextValue();
+//            if (count.containsKey(value)) {
+//                count.put(value, count.get(value) + 1);
+//            } else {
+//                count.put(value, 1);
+//                newRecord.append("(" + i + "," + value + ")");
+//            }
+//
+////                System.out.println(i+",\t\t"+testZipfianFgenerator.nextValue()+"\t\t"+testZipfianFgenerator.lastValue());
+////                System.out.println(i+"\t\t"+testZipfianFgenerator.nextString()+",\t\t"+testZipfianFgenerator.lastString());
+////                System.out.println(i+"\t\t"+testZipfianFgenerator.nextString()+",\t\t"+testZipfianFgenerator.lastString()+"\t\t"+testZipfianFgenerator.nextValue()+"\t\t"+testZipfianFgenerator.lastValue());
+//        }
+//
+////        transactioninsertkeysequence = new AcknowledgedCounterGenerator(finish);
+////
+////        int keynum;
+////        for (int i = 0; i < finish - start; i++) {
+////            do {
+////                keynum = testZipfianFgenerator.nextValue().intValue();
+////            } while (keynum > transactioninsertkeysequence.lastValue());
+////            System.out.println("keychooser:"+keynum);
+////        }
+////        
+//        for (Entry<Number, Integer> entry : count.entrySet()) {
+//            System.out.println(entry.getKey() + "," + entry.getValue());
+//        }
+//        System.out.println("size:" + count.size());
+//        System.out.println(newRecord.toString());
+//
+//    }
+//
+    
+    
+    void testGetValueCostTime(){
+        
+        
+        
+    }
+    
+    
     public String buildKeyName(long keynum) {
         if (!orderedinserts) {
             keynum = Utils.hash(keynum);
@@ -555,6 +687,187 @@ public class CoreWorkload extends Workload {
         value.put(fieldkey, data);
 
         return value;
+    }
+
+    /**
+     * auther : chen10 Builds values for growing fields by chen10
+     */
+    public HashMap<String, HashMap<String, ByteIterator>> buildGrowingFamilyFieldValues(String key) {
+
+        HashMap<String, HashMap<String, ByteIterator>> familyFieldValues = new HashMap<String, HashMap<String, ByteIterator>>();
+
+        int totalFildCount = fieldcount * familycount;
+        boolean[] fieldchoosed = buildGrowingFieldsNumber();
+
+        String family = defaultFamily;
+        String field = defaultField;
+        HashMap<String, ByteIterator> value = new HashMap<String, ByteIterator>();
+
+        for (int i = 0; i < totalFildCount; i++) {
+            if (i == 0) {
+                family = defaultFamily + "0";
+            }
+
+            if (fieldchoosed[i]) {
+                field = defaultField + (i % fieldcount);
+
+                ByteIterator data;
+                if (dataintegrity) {
+                    data = new StringByteIterator(buildDeterministicValue(key, field));
+                } else {
+                    // fill with random data
+                    data = new RandomByteIterator(fieldlengthgenerator.nextValue().longValue());
+                }
+                value.put(field, data);
+            }
+
+            if (i % fieldcount == fieldcount - 1 && i != 0) {
+                if (value.size() > 0) {
+                    familyFieldValues.put(family, value);
+                }
+                family = defaultFamily + ((i + 1) / fieldcount);
+                value = new HashMap<String, ByteIterator>();
+            }
+
+        }
+
+        return familyFieldValues;
+    }
+
+    /**
+     * auther : chen10 Builds values for normal fields by chen10
+     */
+    public HashMap<String, HashMap<String, ByteIterator>> buildFullFamilyFieldValues(String key) {
+        HashMap<String, HashMap<String, ByteIterator>> familyFieldValues = new HashMap<String, HashMap<String, ByteIterator>>();
+
+        for (int i = 0; i < familycount; i++) {
+            HashMap<String, ByteIterator> value = new HashMap<String, ByteIterator>();
+            String family = defaultFamily + i;
+
+//        for (int i = 0; i < recordfieldcount; i++) {
+            for (int j = 0; j < fieldcount; j++) {
+                String fieldkey = defaultField + j;
+                ByteIterator data;
+                if (dataintegrity) {
+                    data = new StringByteIterator(buildDeterministicValue(key, fieldkey));
+                } else {
+                    // fill with random data
+                    data = new RandomByteIterator(fieldlengthgenerator.nextValue().longValue());
+                }
+
+                value.put(fieldkey, data);
+            }
+
+            familyFieldValues.put(family, value);
+        }
+        return familyFieldValues;
+    }
+
+    /**
+     * Build new familyFieldValuesMap for new interface
+     */
+    private HashMap<String, HashMap<String, ByteIterator>> buildFamilyFieldValueMap(String keynum) {
+
+        HashMap<String, HashMap<String, ByteIterator>> familyFieldValuesMap = new HashMap<String, HashMap<String, ByteIterator>>();
+        if (growfield) {
+            System.out.println("這個");
+            familyFieldValuesMap = buildGrowingFamilyFieldValues(keynum);
+            System.out.println("這個節數");
+            
+        } else {
+            System.out.println("那個");
+            familyFieldValuesMap = buildFullFamilyFieldValues(keynum);
+        }
+        return familyFieldValuesMap;
+    }
+
+    /**
+     * Build new familyFieldMaps for new interface
+     */
+    private HashMap<String, Set<String>> buildFamilyFieldMaps() {
+
+        HashMap<String, Set<String>> familyFieldMaps = new HashMap<String, Set<String>>();
+        if (growfield) {
+            System.out.println("buildFamilyFieldMaps 這個");
+            familyFieldMaps = buildGrowingFamilyFieldMaps();
+        } else {
+            System.out.println("buildFamilyFieldMaps 那個");
+            familyFieldMaps = buildFullFamilyFieldMaps();
+        }
+        return familyFieldMaps;
+    }
+
+    HashMap<String, Set<String>> buildFullFamilyFieldMaps() {
+        HashMap<String, Set<String>> familyFieldMaps = new HashMap<String, Set<String>>();
+
+        Set<String> fields = new HashSet<String>();
+        for (int i = 0; i < fieldcount; i++) {
+            String fieldkey = defaultField + i;
+            ByteIterator data;
+            fields.add(fieldkey);
+        }
+
+        for (int i = 0; i < familycount; i++) {
+            String family = defaultFamily + i;
+            familyFieldMaps.put(family, fields);
+        }
+        return familyFieldMaps;
+    }
+
+    HashMap<String, Set<String>> buildGrowingFamilyFieldMaps() {
+
+        HashMap<String, Set<String>> familyFieldMaps = new HashMap<String, Set<String>>();
+        
+        boolean[] fieldchoosed = buildGrowingFieldsNumber();
+
+        int totalFildCount = fieldcount * familycount;
+        String family = defaultFamily;
+        String field = defaultField;
+        Set<String> fields = new HashSet();
+        
+        for (int i = 0; i < totalFildCount; i++) {
+            if (i == 0) {
+                family = defaultFamily + "0";
+            }
+
+            if (fieldchoosed[i]) {
+                field = defaultField + (i % fieldcount);
+                System.out.println("<"+family+","+field+">");
+                fields.add(field);
+            }
+
+            if (i % fieldcount == fieldcount - 1 && i != 0) {
+                if (fields.size() > 0) {
+                    familyFieldMaps.put(family, fields);
+                }
+                family = defaultFamily + ((i + 1) / fieldcount);
+                fields =  new HashSet();
+            }
+        }
+        
+
+        return familyFieldMaps;
+
+    }
+    
+    boolean[] buildGrowingFieldsNumber(){
+        int totalFildCount = fieldcount * familycount;
+        boolean[] fieldchoosed = new boolean[totalFildCount];
+
+        int temp_recordfieldcount = recordhandlefieldcount;
+        //先選數字
+        while (temp_recordfieldcount > 0) {
+            int nextFieldValue = growFamilyFieldchooser.nextValue().intValue();
+            
+            
+            if (fieldchoosed[nextFieldValue]) {
+                continue;
+            } else {
+                fieldchoosed[nextFieldValue] = true;
+                temp_recordfieldcount--;
+            }
+        } 
+        return fieldchoosed;
     }
 
     /**
@@ -603,18 +916,26 @@ public class CoreWorkload extends Workload {
      */
     @Override
     public boolean doInsert(DB db, Object threadstate) {
+
+        Long startTime = System.currentTimeMillis();
         int keynum = keysequence.nextValue().intValue();
         String dbkey = buildKeyName(keynum);
-        HashMap<String, ByteIterator> values = buildValues(dbkey);
 
+        HashMap<String, HashMap<String, ByteIterator>> familyFieldValuesMap = buildFamilyFieldValueMap(dbkey);
+
+        
+        Long afterCreateValueTime = System.currentTimeMillis();
+//        HashMap<String, ByteIterator> values;
+//        if (growfield) {
+//            values = buildGrowingValues(dbkey);
+//        } else {
+//        values = buildValues(dbkey);
+//        }
         Status status;
         int numOfRetries = 0;
         do {
-//      status = db.insert(table, dbkey, values);
-//TODO
-            String family = familychooser.nextString();
-            System.out.println("insert " + table + " " + family + " " + dbkey);
-            status = db.insert(table, dbkey, family, values);
+//      status = db.insert(table, dbkey, values);     
+            status = db.insert(table, dbkey, familyFieldValuesMap);
 
             if (status == Status.OK) {
                 break;
@@ -640,6 +961,10 @@ public class CoreWorkload extends Workload {
             }
         } while (true);
 
+         Long afterScanTime = System.currentTimeMillis();
+         
+        System.out.println("create time : "+ (afterCreateValueTime - startTime));
+        System.out.println("insert time : "+ (afterScanTime -afterCreateValueTime));
         return (status == Status.OK);
     }
 
@@ -717,84 +1042,91 @@ public class CoreWorkload extends Workload {
 
         String keyname = buildKeyName(keynum);
 
-        HashSet<String> fields = null;
-
-        if (!readallfields) {
-            // read a random field
-            String fieldname = fieldnames.get(fieldchooser.nextValue().intValue());
-
-            fields = new HashSet<String>();
-            fields.add(fieldname);
-        } else if (dataintegrity) {
-            // pass the full field list if dataintegrity is on for verification
-            fields = new HashSet<String>(fieldnames);
-        }
-
+        HashMap<String, Set<String>> familyFieldMaps = buildFamilyFieldMaps();
         HashMap<String, ByteIterator> cells = new HashMap<String, ByteIterator>();
+
+        db.read(table, keyname, familyFieldMaps, cells);
+        System.out.println("doTransactionRead " + table + " " + keyname);
+
+        for (Map.Entry<String, ByteIterator> result : cells.entrySet()) {
+            System.out.print(result.getKey() + ",");
+//            
+//            System.out.println(result.getValue() + ",");
+        }
+        System.out.println();
+
+//        if (!readallfields) {
+//            // read a random field
+//            String fieldname = fieldnames.get(fieldchooser.nextValue().intValue());
+//
+//            fields = new HashSet<String>();
+//            fields.add(fieldname);
+//        } else if (dataintegrity) {
+//            // pass the full field list if dataintegrity is on for verification
+//            fields = new HashSet<String>(fieldnames);
+//        }
+//        HashMap<String, ByteIterator> cells = new HashMap<String, ByteIterator>();
 //    db.read(table, keyname, fields, cells);
-//TODO
-
-        System.out.println("read " + table + " "  + " " + keyname);
-        db.read(table, keyname, fields, cells);
-        
-        for (Map.Entry<String, ByteIterator> entry : cells.entrySet()) {
-               System.out.println(cells);
-        }
-
-  
-
-        if (dataintegrity) {
-            verifyRow(keyname, cells);
-        }
+//
+//        System.out.println("read " + table + " " + " " + keyname);
+//        db.read(table, keyname, familyFieldMaps, cells);
+//
+//        for (Map.Entry<String, ByteIterator> entry : cells.entrySet()) {
+//            System.out.println(cells);
+//        }
+//
+//        if (dataintegrity) {
+//            verifyRow(keyname, cells);
+//        }
     }
 
     public void doTransactionReadModifyWrite(DB db) {
         // choose a random key
         int keynum = nextKeynum();
-
         String keyname = buildKeyName(keynum);
 
-        HashSet<String> fields = null;
-
-        if (!readallfields) {
-            // read a random field
-            String fieldname = fieldnames.get(fieldchooser.nextValue().intValue());
-
-            fields = new HashSet<String>();
-            fields.add(fieldname);
-        }
-
-        HashMap<String, ByteIterator> values;
-
-        if (writeallfields) {
-            // new data for all the fields
-            values = buildValues(keyname);
-        } else {
-            // update a random field
-            values = buildSingleValue(keyname);
-        }
-
-        // do the transaction
+        HashMap<String, Set<String>> familyFieldMaps = buildFamilyFieldMaps();
         HashMap<String, ByteIterator> cells = new HashMap<String, ByteIterator>();
+        HashMap<String, HashMap<String, ByteIterator>> familyFieldValuesMap = buildFamilyFieldValueMap(keyname);
 
+//        HashSet<String> fields = null;
+//        if (!readallfields) {
+//            // read a random field
+//            String fieldname = fieldnames.get(fieldchooser.nextValue().intValue());
+//
+//            fields = new HashSet<String>();
+//            fields.add(fieldname);
+//        }
+//        HashMap<String, ByteIterator> values;
+//        if (writeallfields) {
+//            // new data for all the fields
+//            values = buildValues(keyname);
+//        } else {
+//            // update a random field
+//            values = buildSingleValue(keyname);
+//        }
+        // do the transaction
+//        HashMap<String, ByteIterator> cells = new HashMap<String, ByteIterator>();
         long ist = _measurements.getIntendedtartTimeNs();
         long st = System.nanoTime();
 //    db.read(table, keyname, fields, cells);
-//TODO
-
 //    db.update(table, keyname, values);
-//TODO
-        String family = familychooser.nextString();
-        System.out.println("ReadModifyWrite " + table + " " + family + " " + keyname);
-        db.read(table, keyname, fields, cells);
-        db.update(table, keyname, family, values);
+
+        db.read(table, keyname, familyFieldMaps, cells);
+        db.update(table, keyname, familyFieldValuesMap);
+
+        System.out.println("doTransactionReadModifyWrite " + "," + keyname + ":");
+
+        for (Map.Entry<String, ByteIterator> result : cells.entrySet()) {
+            System.out.print(result.getKey() + ",");
+        }
+        System.out.println();
 
         long en = System.nanoTime();
 
-        if (dataintegrity) {
-            verifyRow(keyname, cells);
-        }
-
+//        if (dataintegrity) {
+//            verifyRow(keyname, cells);
+//        }
         _measurements.measure("READ-MODIFY-WRITE", (int) ((en - st) / 1000));
         _measurements.measureIntended("READ-MODIFY-WRITE", (int) ((en - ist) / 1000));
     }
@@ -808,30 +1140,39 @@ public class CoreWorkload extends Workload {
         // choose a random scan length
         int len = scanlength.nextValue().intValue();
 
-        HashSet<String> fields = null;
+        HashMap<String, Set<String>> familyFieldMaps = buildFamilyFieldMaps();
+        Vector<HashMap<String, ByteIterator>> rows = new Vector<HashMap<String, ByteIterator>>();
 
-        if (!readallfields) {
-            // read a random field
-            String fieldname = fieldnames.get(fieldchooser.nextValue().intValue());
+        System.out.println("scan " + table + " " + startkeyname + ",len = " + len);
+        db.scan(table, startkeyname, len, familyFieldMaps, rows);
 
-            fields = new HashSet<String>();
-            fields.add(fieldname);
+        for (HashMap<String, ByteIterator> row : rows) {
+            for (Map.Entry<String, ByteIterator> result : row.entrySet()) {
+                System.out.print(result.getKey() + ",");
+            }
+            System.out.println();
         }
 
+//        HashSet<String> fields = null;
+//
+//        if (!readallfields) {
+//            // read a random field
+//            String fieldname = fieldnames.get(fieldchooser.nextValue().intValue());
+//
+//            fields = new HashSet<String>();
+//            fields.add(fieldname);
+//        }
+//
 //    db.scan(table, startkeyname, len, fields, new Vector<HashMap<String, ByteIterator>>());
-//TODO
-        String family = familychooser.nextString();
-        System.out.println("scan " + table + " " + family+","+len + " " + startkeyname);
-        Vector<HashMap<String, ByteIterator>> result = new Vector<HashMap<String, ByteIterator>>();
-        db.scan(table, startkeyname,family, len, fields, result);
-    
-        if(result.size()>0){
-            System.out.println("get "+result.size()+",");
+//        System.out.println("scan " + table + " " + defaultFamily + "," + len + " " + startkeyname);
+//        Vector<HashMap<String, ByteIterator>> result = new Vector<HashMap<String, ByteIterator>>();
+//        db.scan(table, startkeyname, defaultFamily, len, fields, result);
+        if (rows.size() > 0) {
+            System.out.println("get " + rows.size() + ",");
+        } else {
+            System.out.println("get " + rows.size());
         }
-        else{
-            System.out.println("get "+result.size());
-        }
-        
+
     }
 
     public void doTransactionUpdate(DB db) {
@@ -840,40 +1181,36 @@ public class CoreWorkload extends Workload {
 
         String keyname = buildKeyName(keynum);
 
-        HashMap<String, ByteIterator> values;
-
-        if (writeallfields) {
-            // new data for all the fields
-            values = buildValues(keyname);
-        } else {
-            // update a random field
-            values = buildSingleValue(keyname);
-        }
-
+//        HashMap<String, ByteIterator> values;
+//
+//        if (writeallfields) {
+//            // new data for all the fields
+//            values = buildValues(keyname);
+//        } else {
+//            // update a random field
+//            values = buildSingleValue(keyname);
+//        }
 //    db.update(table, keyname, values);
 //TODO
+        HashMap<String, HashMap<String, ByteIterator>> familyFieldValuesMap = buildFamilyFieldValueMap(keyname);
+        System.out.println("update " + table + " " + defaultFamily + " " + keyname);
+        db.update(table, keyname, familyFieldValuesMap);
 
-        String family = familychooser.nextString();
-        System.out.println("update " + table + " " + family + " " + keyname);
-        db.update(table, keyname,family, values);
-        
     }
 
     public void doTransactionInsert(DB db) {
         // choose the next key
         int keynum = transactioninsertkeysequence.nextValue();
 
-
-        
         try {
             String dbkey = buildKeyName(keynum);
-
-            HashMap<String, ByteIterator> values = buildValues(dbkey);
+            HashMap<String, HashMap<String, ByteIterator>> familyFieldValuesMap = buildFamilyFieldValueMap(dbkey);
+            
+            
+//            HashMap<String, ByteIterator> values = buildValues(dbkey);
 //      db.insert(table, dbkey, values);
 //TODO
-        String family = familychooser.nextString();
-        System.out.println("insert " + table + " " + family + " " + dbkey);
-        db.insert(table, dbkey, family, values);
+            db.insert(table, dbkey, familyFieldValuesMap);
 
         } finally {
             transactioninsertkeysequence.acknowledge(keynum);
@@ -929,7 +1266,27 @@ public class CoreWorkload extends Workload {
         return operationchooser;
     }
 
-    public static DiscreteGenerator createFamilyGenerator(final Properties p) {
+    public NumberGenerator createFieldGrower(final Properties p) throws WorkloadException {
+        NumberGenerator fieldGrower;
+        String fieldExpension
+                = p.getProperty(FIELD_EXPENSION, DEFAULT_FIELD_EXPENSION);
+System.out.println("fieldExpension:"+fieldExpension);
+        if (fieldExpension.compareTo("uniform") == 0) {
+            fieldGrower = new UniformIntegerGenerator(0,( fieldcount * familycount) - 1);
+        } else if(fieldExpension.compareTo("hotspot")  == 0 ){
+            double hotsetfraction= Double.parseDouble(p.getProperty(HOTSPOT_DATA_FRACTION, HOTSPOT_DATA_FRACTION_DEFAULT));
+            double hotopnfraction= Double.parseDouble(p.getProperty(HOTSPOT_OPN_FRACTION, HOTSPOT_OPN_FRACTION_DEFAULT));
+            fieldGrower = new  HotspotIntegerGenerator(0,( fieldcount * familycount) - 1,
+                    hotsetfraction, hotopnfraction);
+        }
+        else {
+            throw new WorkloadException("Unknown request distribution \"" + fieldExpension + "\"");
+        }
+
+        return fieldGrower;
+    }
+
+    public DiscreteGenerator createFamilyGenerator(final Properties p) {
         if (p == null) {
             throw new IllegalArgumentException("Properties object cannot be null");
         }
